@@ -50,6 +50,10 @@ export default function SegurMapApp() {
   const [isLoading, setIsLoading] = useState(true);
   const [showNewInspectionModal, setShowNewInspectionModal] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [cancelPassword, setCancelPassword] = useState("");
+  const [cancelPasswordError, setCancelPasswordError] = useState(false);
+  // isOwner: true solo en el dispositivo que inició la inspección activa
+  const [isOwner, setIsOwner] = useState(false);
   const [showConfigAuth, setShowConfigAuth] = useState(false);
   const [configPassword, setConfigPassword] = useState("");
   const [configPasswordError, setConfigPasswordError] = useState(false);
@@ -133,10 +137,14 @@ export default function SegurMapApp() {
       if (activeInsp) {
         setCurrentInspection(activeInsp);
         setIsInspectionActive(true);
+        // Restore ownership: only the device that started it has the ownerInspectionId
+        const storedOwnerId = typeof window !== "undefined" ? localStorage.getItem("ownerInspectionId") : null;
+        setIsOwner(storedOwnerId === activeInsp.id);
         setZones(activeInsp.zones_data ?? (configZones ?? INITIAL_ZONES).map(z => ({ ...z, status: "PENDING" as ZoneStatus, findings: {} })));
       } else {
         setIsInspectionActive(false);
         setCurrentInspection(null);
+        setIsOwner(false);
         // Strategy: zones_config owns the layout (names, positions).
         // Last completed inspection owns the visual status (OK/ISSUE).
         // We merge both: base = zones_config, then overlay status from last inspection.
@@ -225,6 +233,9 @@ export default function SegurMapApp() {
     });
     const newInsp: Inspection = await res.json();
     setCurrentInspection(newInsp);
+    // Mark this device as the owner of this inspection
+    if (typeof window !== "undefined") localStorage.setItem("ownerInspectionId", newInsp.id);
+    setIsOwner(true);
     // Use current configured zones (from config/DB) as base, resetting status and findings
     const freshZones = zones.map(z => ({ ...z, status: "PENDING" as ZoneStatus, findings: {} }));
     setZones(freshZones);
@@ -245,7 +256,10 @@ export default function SegurMapApp() {
     if (!currentInspection) {
       setIsInspectionActive(false);
       setCurrentInspection(null);
+      setIsOwner(false);
+      if (typeof window !== "undefined") localStorage.removeItem("ownerInspectionId");
       setShowCancelConfirm(false);
+      setCancelPassword(""); setCancelPasswordError(false);
       // Restore zones from config
       try {
         const cfgRes = await fetch("/api/config");
@@ -266,7 +280,10 @@ export default function SegurMapApp() {
     });
     setIsInspectionActive(false);
     setCurrentInspection(null);
+    setIsOwner(false);
+    if (typeof window !== "undefined") localStorage.removeItem("ownerInspectionId");
     setShowCancelConfirm(false);
+    setCancelPassword(""); setCancelPasswordError(false);
     // Reload everything — same merge logic as loadData
     const [insRes, finRes, cfgRes] = await Promise.all([
       fetch("/api/inspections"),
@@ -539,6 +556,8 @@ Responde en texto plano en español, sin markdown, sin asteriscos, sin símbolos
 
     if (closeData.already_closed) {
       setIsFinishing(false);
+      setIsOwner(false);
+      if (typeof window !== "undefined") localStorage.removeItem("ownerInspectionId");
       await loadData();
       setIsInspectionActive(false);
       setCurrentInspection(null);
@@ -555,6 +574,8 @@ Responde en texto plano en español, sin markdown, sin asteriscos, sin símbolos
     const finishedZones = [...freshZonesData];
     setIsInspectionActive(false);
     setCurrentInspection(null);
+    setIsOwner(false);
+    if (typeof window !== "undefined") localStorage.removeItem("ownerInspectionId");
     setIsFinishing(false);
 
     const [insRes, finRes] = await Promise.all([
@@ -744,6 +765,7 @@ Responde en texto plano en español, sin markdown, sin asteriscos, sin símbolos
             setViewFinding={setViewFinding}
             summaryCollapsedKeys={summaryCollapsedKeys}
             toggleSummaryKey={toggleSummaryKey}
+            isOwner={isOwner}
           />
         )}
 
@@ -851,19 +873,42 @@ Responde en texto plano en español, sin markdown, sin asteriscos, sin símbolos
               <h3 className="text-xl font-black text-slate-800">¿Cancelar recorrido?</h3>
               <p className="text-slate-500 text-sm mt-1">Se eliminará la inspección en curso y todos sus hallazgos. Esta acción no se puede deshacer.</p>
             </div>
-            <div className="p-6 flex gap-3">
-              <button
-                onClick={() => setShowCancelConfirm(false)}
-                className="flex-1 py-3 border-2 border-slate-200 rounded-xl font-black text-xs uppercase text-slate-600 hover:bg-slate-50 transition-all"
-              >
-                CONTINUAR RECORRIDO
-              </button>
-              <button
-                onClick={handleCancelInspection}
-                className="flex-1 py-3 bg-red-600 text-white rounded-xl font-black text-xs uppercase hover:bg-red-700 transition-all shadow-lg"
-              >
-                SÍ, CANCELAR
-              </button>
+            <div className="p-6 space-y-4">
+              <div>
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest text-center mb-2">Confirma con contraseña de admin</p>
+                <input
+                  type="password"
+                  value={cancelPassword}
+                  onChange={e => { setCancelPassword(e.target.value); setCancelPasswordError(false); }}
+                  onKeyDown={e => {
+                    if (e.key === "Enter" && cancelPassword === "admin") handleCancelInspection();
+                    else if (e.key === "Enter") setCancelPasswordError(true);
+                  }}
+                  placeholder="Contraseña"
+                  className={`w-full px-4 py-3 bg-slate-50 border-2 rounded-xl text-center font-black text-lg tracking-widest outline-none transition-all ${cancelPasswordError ? "border-red-400 bg-red-50" : "border-slate-200 focus:border-red-400"}`}
+                  autoFocus
+                />
+                {cancelPasswordError && (
+                  <p className="text-red-500 text-[10px] font-black uppercase text-center mt-1.5">Contraseña incorrecta</p>
+                )}
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => { setShowCancelConfirm(false); setCancelPassword(""); setCancelPasswordError(false); }}
+                  className="flex-1 py-3 border-2 border-slate-200 rounded-xl font-black text-xs uppercase text-slate-600 hover:bg-slate-50 transition-all"
+                >
+                  CONTINUAR RECORRIDO
+                </button>
+                <button
+                  onClick={() => {
+                    if (cancelPassword === "admin") handleCancelInspection();
+                    else setCancelPasswordError(true);
+                  }}
+                  className="flex-1 py-3 bg-red-600 text-white rounded-xl font-black text-xs uppercase hover:bg-red-700 transition-all shadow-lg"
+                >
+                  SÍ, CANCELAR
+                </button>
+              </div>
             </div>
           </div>
         </div>
