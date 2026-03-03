@@ -23,6 +23,7 @@ export function CurrentView({
   setViewFinding,
   summaryCollapsedKeys,
   toggleSummaryKey,
+  isOwner,
 }: {
   isInspectionActive: boolean;
   currentInspection: Inspection | null;
@@ -42,6 +43,7 @@ export function CurrentView({
   setViewFinding: (f: Finding | null) => void;
   summaryCollapsedKeys: Set<string>;
   toggleSummaryKey: (key: string) => void;
+  isOwner: boolean;
 }) {
   return (
     <div className="space-y-6">
@@ -98,12 +100,21 @@ export function CurrentView({
               NUEVA INSPECCIÓN
             </button>
           ) : (
+            isOwner ? (
             <button
               onClick={() => setShowCancelConfirm(true)}
               className="bg-red-500/10 text-red-400 border border-red-500/30 px-5 py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-red-500/20 transition-all"
             >
               CANCELAR RECORRIDO
             </button>
+            ) : (
+            <span className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-600 text-[9px] font-black uppercase tracking-widest">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+              Solo lectura
+            </span>
+            )
           )}
         </div>
 
@@ -330,6 +341,7 @@ export function CurrentView({
                 }
               </p>
             </div>
+            {isOwner ? (
             <button
               onClick={() => setShowFinishConfirm(true)}
               disabled={isFinishing}
@@ -340,6 +352,14 @@ export function CurrentView({
                 : <><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> FINALIZAR EVALUACIÓN</>
               }
             </button>
+            ) : (
+            <span className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-white/10 border border-white/20 text-white/60 text-xs font-black uppercase tracking-widest">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+              Solo el iniciador puede finalizar
+            </span>
+            )}
           </div>
         );
       })()}
