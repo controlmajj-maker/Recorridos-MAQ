@@ -47,7 +47,6 @@ export default function SegurMapApp() {
   const [zoomImage, setZoomImage] = useState<string | null>(null);
   const [isFinishing, setIsFinishing] = useState(false);
   const [showFinishConfirm, setShowFinishConfirm] = useState(false);
-  const [expandedInspectionId, setExpandedInspectionId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showNewInspectionModal, setShowNewInspectionModal] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
@@ -770,8 +769,6 @@ Responde en texto plano en español, sin markdown, sin asteriscos, sin símbolos
             allFindings={allFindings}
             activeFindings={activeFindings}
             sections={sections}
-            expandedInspectionId={expandedInspectionId}
-            setExpandedInspectionId={setExpandedInspectionId}
             setViewFinding={setViewFinding}
             summaryCollapsedKeys={summaryCollapsedKeys}
             toggleSummaryKey={toggleSummaryKey}
