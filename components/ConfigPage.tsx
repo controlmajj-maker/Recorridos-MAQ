@@ -9,6 +9,7 @@ export function ConfigPage({
   inspectionCount, findingCount, zones,
   onZonesChange, onDeleteAll, inspections, allFindings, onDeleteInspection,
   sections, onSectionsChange,
+  isInspectionActive, isOwner, onShowCancelConfirm, onShowFinishConfirm, isFinishing, pendingZones,
 }: {
   inspectionCount: number;
   findingCount: number;
@@ -20,6 +21,12 @@ export function ConfigPage({
   onDeleteInspection: (id: string) => Promise<void>;
   sections: Section[];
   onSectionsChange: (sections: Section[]) => Promise<void>;
+  isInspectionActive: boolean;
+  isOwner: boolean;
+  onShowCancelConfirm: () => void;
+  onShowFinishConfirm: () => void;
+  isFinishing: boolean;
+  pendingZones: number;
 }) {
   // ── Section state ──
   const [newSectionName, setNewSectionName] = useState("");
@@ -197,6 +204,52 @@ export function ConfigPage({
         {lastSaveStatus === "ok" && <span className="text-[10px] font-black text-green-600 uppercase">✓ Guardado</span>}
         {lastSaveStatus === "error" && <span className="text-[10px] font-black text-red-600 uppercase">✕ Error al guardar</span>}
       </div>
+
+      {/* ── Botones de control del recorrido activo ── */}
+      {isInspectionActive && (
+        <div className={`rounded-2xl border-2 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${isOwner ? "bg-blue-50 border-blue-200" : "bg-amber-50 border-amber-200"}`}>
+          <div>
+            <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest mb-1 ${isOwner ? "bg-blue-100 text-blue-600" : "bg-amber-100 text-amber-600"}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${isOwner ? "bg-blue-500 animate-pulse" : "bg-amber-400"}`} />
+              {isOwner ? "Recorrido en progreso · tú eres el iniciador" : "Recorrido en progreso · solo lectura"}
+            </div>
+            <p className="text-xs font-bold text-slate-500">
+              {isOwner
+                ? pendingZones > 0
+                  ? `${pendingZones} zona${pendingZones !== 1 ? "s" : ""} pendiente${pendingZones !== 1 ? "s" : ""} de evaluar`
+                  : "Todas las zonas evaluadas"
+                : "Solo el dispositivo iniciador puede cancelar o finalizar"}
+            </p>
+          </div>
+          {isOwner ? (
+            <div className="flex gap-2 shrink-0">
+              <button
+                onClick={onShowCancelConfirm}
+                className="bg-red-500/10 text-red-500 border border-red-300 px-4 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-red-500/20 transition-all"
+              >
+                CANCELAR RECORRIDO
+              </button>
+              <button
+                onClick={onShowFinishConfirm}
+                disabled={isFinishing}
+                className="bg-blue-600 text-white px-4 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-blue-700 transition-all shadow-md flex items-center gap-2 disabled:bg-slate-300"
+              >
+                {isFinishing
+                  ? <><div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> GENERANDO...</>
+                  : "FINALIZAR EVALUACIÓN"
+                }
+              </button>
+            </div>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-white border border-amber-200 text-amber-600 text-[9px] font-black uppercase tracking-widest">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+              Solo lectura
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3">
