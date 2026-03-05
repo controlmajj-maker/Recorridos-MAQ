@@ -58,6 +58,12 @@ function FindingMiniCard({
         {isClosed && f.corrective_actions && (
           <p className="text-green-700 text-[9px] mt-1 font-bold truncate">✓ {f.corrective_actions}</p>
         )}
+        {isClosed && f.closure_photo_url && (
+          <div className="mt-1.5 rounded-lg overflow-hidden border border-green-200">
+            <img src={f.closure_photo_url} alt="Evidencia cierre" className="w-full h-16 object-cover" />
+            <p className="text-[7px] text-green-600 font-black uppercase text-center py-0.5 bg-green-50">📸 Evidencia de cierre</p>
+          </div>
+        )}
         {isClosed && f.closed_at && (
           <p className="text-blue-600 text-[9px] mt-0.5 font-black">
             Cerrado: {new Date(f.closed_at).toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" })}
@@ -591,6 +597,14 @@ function EditableFindingViewModal({
             <div className="bg-green-50 p-4 rounded-xl border-2 border-green-100">
               <p className="text-[9px] font-black text-green-600 uppercase mb-1">✅ Acciones Correctivas:</p>
               <p className="text-sm text-slate-700">{finding.corrective_actions}</p>
+              {finding.closure_photo_url && (
+                <div className="mt-3">
+                  <p className="text-[9px] font-black text-green-600 uppercase mb-1.5">📸 Evidencia de Cierre:</p>
+                  <div className="rounded-xl overflow-hidden border-2 border-green-200 shadow-sm">
+                    <img src={finding.closure_photo_url} alt="Evidencia de cierre" className="w-full object-cover max-h-48" />
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
