@@ -51,11 +51,15 @@ export async function POST(req: Request) {
 export async function PUT(req: Request) {
   try {
     const body = await req.json();
+    // Ensure column exists (safe to run every time — no-op if already present)
+    await pool.query(`
+      ALTER TABLE findings ADD COLUMN IF NOT EXISTS closure_photo_url TEXT
+    `);
     const result = await pool.query(
       `UPDATE findings 
-       SET is_closed = true, corrective_actions = $1, closed_at = NOW()
-       WHERE id = $2 RETURNING *`,
-      [body.corrective_actions, body.id]
+       SET is_closed = true, corrective_actions = $1, closed_at = NOW(), closure_photo_url = COALESCE($2, closure_photo_url)
+       WHERE id = $3 RETURNING *`,
+      [body.corrective_actions, body.closure_photo_url || null, body.id]
     );
     return NextResponse.json(result.rows[0]);
   } catch (error: any) {
