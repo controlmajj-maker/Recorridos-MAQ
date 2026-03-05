@@ -37,7 +37,21 @@ function FindingMiniCard({
               📍 {f.zone_name}
             </span>
           )}
-          <span className="text-[8px] text-slate-400 ml-auto">{new Date(f.created_at).toLocaleDateString()}</span>
+          {/* Icono de borrar — solo en editMode, pequeño, en la esquina superior derecha */}
+          {editMode && onRequestDelete && (
+            <button
+              onClick={e => { e.stopPropagation(); onRequestDelete(f); }}
+              className="ml-auto w-6 h-6 flex items-center justify-center rounded-lg bg-red-100 hover:bg-red-200 text-red-600 transition-all shrink-0"
+              title="Eliminar hallazgo"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
+          )}
+          {!editMode && (
+            <span className="text-[8px] text-slate-400 ml-auto">{new Date(f.created_at).toLocaleDateString()}</span>
+          )}
         </div>
         <p className="font-black text-slate-800 text-xs truncate">{f.item_label}</p>
         <p className="text-slate-500 text-[10px] italic truncate">"{f.description}"</p>
@@ -49,16 +63,16 @@ function FindingMiniCard({
             Cerrado: {new Date(f.closed_at).toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" })}
           </p>
         )}
-        {/* Botón eliminar solo visible en editMode */}
-        {editMode && onRequestDelete && (
+        {/* Botón Ver detalles — grande, verde, solo en editMode */}
+        {editMode && (
           <button
-            onClick={e => { e.stopPropagation(); onRequestDelete(f); }}
-            className="mt-2 w-full py-1.5 text-[9px] font-black uppercase bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg transition-all"
+            onClick={e => { e.stopPropagation(); onView(f); }}
+            className="mt-2 w-full py-2 text-[10px] font-black uppercase bg-green-600 hover:bg-green-700 text-white rounded-lg transition-all shadow-sm"
           >
-            🗑 Eliminar hallazgo
+            Ver detalles
           </button>
         )}
-        {/* En modo normal, clic en la card abre detalle — hint sutil */}
+        {/* En modo normal, hint sutil */}
         {!editMode && (
           <p className="text-[8px] text-slate-300 font-bold mt-1.5 text-right">toca para ver →</p>
         )}
