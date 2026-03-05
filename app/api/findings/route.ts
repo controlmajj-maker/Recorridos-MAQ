@@ -81,16 +81,18 @@ export async function PATCH(req: Request) {
 export async function DELETE(req: Request) {
   try {
     const { id } = await req.json();
-    // Fetch photo_url before deleting
-    const row = await pool.query("SELECT photo_url FROM findings WHERE id = $1", [id]);
+    // Fetch needed fields before deleting
+    const row = await pool.query("SELECT photo_url, inspection_id, zone_id FROM findings WHERE id = $1", [id]);
     const photoUrl: string | null = row.rows[0]?.photo_url ?? null;
+    const inspectionId: string | null = row.rows[0]?.inspection_id ?? null;
+    const zoneId: string | null = row.rows[0]?.zone_id ?? null;
     // Delete from DB
     await pool.query("DELETE FROM findings WHERE id = $1", [id]);
     // Delete from Vercel Blob — silently ignore errors
     if (photoUrl) {
       try { await del(photoUrl); } catch { /* blob may not exist */ }
     }
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, inspection_id: inspectionId, zone_id: zoneId });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
