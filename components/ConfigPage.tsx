@@ -32,7 +32,9 @@ export function ConfigPage({
   const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
   const [editingSectionName, setEditingSectionName] = useState("");
   const [sectionToDelete, setSectionToDelete] = useState<Section | null>(null);
+  const [deleteSectionWord, setDeleteSectionWord] = useState("");
   const [expandedSectionCfgIds, setExpandedSectionCfgIds] = useState<Set<string>>(new Set());
+  const [newSectionSelectedZones, setNewSectionSelectedZones] = useState<Set<string>>(new Set());
 
   // ── Zone state (per-section inputs) ──
   const [newZoneNames, setNewZoneNames] = useState<Record<string, string>>({});
@@ -65,14 +67,12 @@ export function ConfigPage({
   const handleAddSection = async () => {
     if (!newSectionName.trim()) return;
     const sec: Section = { id: `s${Date.now()}`, name: newSectionName.trim(), zoneIds: [] };
-    // Auto-assign unassigned zones to first section if this is the first one being created
-    const assignedIds = new Set(sections.flatMap(s => s.zoneIds));
-    const unassigned = zones.filter(z => !assignedIds.has(z.id));
-    const newSec = sections.length === 0 && unassigned.length > 0
-      ? { ...sec, zoneIds: unassigned.map(z => z.id) }
+    const newSec = newSectionSelectedZones.size > 0
+      ? { ...sec, zoneIds: Array.from(newSectionSelectedZones) }
       : sec;
     const updated = [...sections, newSec];
     setNewSectionName("");
+    setNewSectionSelectedZones(new Set());
     setExpandedSectionCfgIds(prev => { const n = new Set(prev); n.add(newSec.id); return n; });
     setIsSaving(true); setLastSaveStatus("saving");
     try { await onSectionsChange(updated); setLastSaveStatus("ok"); setTimeout(() => setLastSaveStatus("idle"), 2000); }
@@ -89,8 +89,10 @@ export function ConfigPage({
   };
 
   const handleDeleteSection = async (sec: Section) => {
+    if (deleteSectionWord !== "BORRAR") return;
     const updated = sections.filter(s => s.id !== sec.id);
     setSectionToDelete(null);
+    setDeleteSectionWord("");
     setIsSaving(true); setLastSaveStatus("saving");
     try { await onSectionsChange(updated); setLastSaveStatus("ok"); setTimeout(() => setLastSaveStatus("idle"), 2000); }
     catch { setLastSaveStatus("error"); } finally { setIsSaving(false); }
@@ -282,6 +284,37 @@ export function ConfigPage({
               + ADD
             </button>
           </div>
+          {/* Zonas sin asignar disponibles para incluir en la nueva sección */}
+          {(() => {
+            const assignedIds = new Set(sections.flatMap(s => s.zoneIds));
+            const unassigned = zones.filter(z => !assignedIds.has(z.id));
+            if (unassigned.length === 0) return null;
+            return (
+              <div className="border border-amber-200 bg-amber-50/60 rounded-xl px-3 py-2.5 space-y-1.5">
+                <p className="text-[9px] font-black text-amber-700 uppercase tracking-widest">
+                  Zonas sin sección — selecciona las que quieres incluir en la nueva sección:
+                </p>
+                <div className="space-y-1">
+                  {unassigned.map(zone => (
+                    <label key={zone.id} className="flex items-center gap-2 cursor-pointer group">
+                      <input
+                        type="checkbox"
+                        checked={newSectionSelectedZones.has(zone.id)}
+                        onChange={() => setNewSectionSelectedZones(prev => {
+                          const next = new Set(prev);
+                          if (next.has(zone.id)) next.delete(zone.id); else next.add(zone.id);
+                          return next;
+                        })}
+                        className="w-3.5 h-3.5 rounded accent-indigo-600"
+                      />
+                      <span className="text-xs font-black text-slate-700 group-hover:text-indigo-700 transition-colors">{zone.name}</span>
+                      <span className="text-[7px] bg-slate-100 text-slate-400 px-1.5 py-0.5 rounded-full font-black uppercase">{zone.status}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
 
           {sections.length === 0 && (
             <p className="text-center text-slate-400 text-xs py-3 font-bold uppercase">Sin secciones creadas. Agrega la primera.</p>
@@ -353,7 +386,7 @@ export function ConfigPage({
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                             </svg>
                           </button>
-                          <button onClick={() => setSectionToDelete(sec)} className="w-6 h-6 bg-red-50 text-red-500 rounded-md flex items-center justify-center text-[10px] hover:bg-red-100 font-black">✕</button>
+                          <button onClick={() => { setSectionToDelete(sec); setDeleteSectionWord(""); }} className="w-6 h-6 bg-red-50 text-red-500 rounded-md flex items-center justify-center text-[10px] hover:bg-red-100 font-black">✕</button>
                           <svg className={`w-4 h-4 text-slate-400 transition-transform ml-1 ${isExpanded ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                           </svg>
@@ -600,12 +633,31 @@ export function ConfigPage({
               <h3 className="text-lg font-black">¿Eliminar sección?</h3>
               <p className="text-red-100 text-xs mt-1 font-bold">"{sectionToDelete.name}"</p>
             </div>
-            <div className="p-4 text-center">
-              <p className="text-xs text-slate-500">Las zonas asignadas no se eliminarán, solo se desagruparán.</p>
+            <div className="p-4 space-y-3">
+              <p className="text-xs text-slate-500 text-center">Las zonas asignadas no se eliminarán, solo se desagruparán.</p>
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 text-center">
+                  Escribe <span className="text-red-600 font-black">BORRAR</span> para confirmar
+                </label>
+                <input
+                  autoFocus
+                  value={deleteSectionWord}
+                  onChange={e => setDeleteSectionWord(e.target.value)}
+                  placeholder="BORRAR"
+                  className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-center font-black text-lg tracking-widest focus:border-red-400 outline-none"
+                />
+              </div>
             </div>
             <div className="px-4 pb-4 flex gap-2">
-              <button onClick={() => setSectionToDelete(null)} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-black text-xs uppercase text-slate-500">CANCELAR</button>
-              <button onClick={() => handleDeleteSection(sectionToDelete)} className="flex-1 py-2.5 bg-red-600 text-white rounded-xl font-black text-xs uppercase hover:bg-red-700 shadow">ELIMINAR</button>
+              <button
+                onClick={() => { setSectionToDelete(null); setDeleteSectionWord(""); }}
+                className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-black text-xs uppercase text-slate-500"
+              >CANCELAR</button>
+              <button
+                disabled={deleteSectionWord !== "BORRAR"}
+                onClick={() => handleDeleteSection(sectionToDelete)}
+                className={`flex-1 py-2.5 rounded-xl font-black text-xs uppercase text-white ${deleteSectionWord === "BORRAR" ? "bg-red-600 hover:bg-red-700 shadow" : "bg-slate-300"}`}
+              >ELIMINAR</button>
             </div>
           </div>
         </div>
