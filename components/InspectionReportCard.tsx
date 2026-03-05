@@ -19,9 +19,10 @@ function FindingMiniCard({
   const isClosed = f.is_closed === true || (f as any).is_closed === "true";
   return (
     <div
+      onClick={() => { if (!editMode) onView(f); }}
       className={`rounded-xl border-2 transition-all overflow-hidden ${
         isClosed ? "bg-green-50/50 border-green-100" : "bg-red-50/50 border-red-100"
-      }`}
+      } ${!editMode ? "cursor-pointer hover:scale-[1.01]" : ""}`}
     >
       {f.photo_url && (
         <img src={f.photo_url} alt="Evidencia" className="w-full h-28 object-cover" />
@@ -48,23 +49,19 @@ function FindingMiniCard({
             Cerrado: {new Date(f.closed_at).toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" })}
           </p>
         )}
-        {/* Botones de acción: ver siempre, eliminar solo en editMode */}
-        <div className="flex gap-1.5 mt-2">
+        {/* Botón eliminar solo visible en editMode */}
+        {editMode && onRequestDelete && (
           <button
-            onClick={() => onView(f)}
-            className="flex-1 py-1.5 text-[9px] font-black uppercase bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg transition-all"
+            onClick={e => { e.stopPropagation(); onRequestDelete(f); }}
+            className="mt-2 w-full py-1.5 text-[9px] font-black uppercase bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg transition-all"
           >
-            Ver detalle
+            🗑 Eliminar hallazgo
           </button>
-          {editMode && onRequestDelete && (
-            <button
-              onClick={() => onRequestDelete(f)}
-              className="py-1.5 px-2.5 text-[9px] font-black uppercase bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg transition-all"
-            >
-              🗑 Eliminar
-            </button>
-          )}
-        </div>
+        )}
+        {/* En modo normal, clic en la card abre detalle — hint sutil */}
+        {!editMode && (
+          <p className="text-[8px] text-slate-300 font-bold mt-1.5 text-right">toca para ver →</p>
+        )}
       </div>
     </div>
   );
@@ -335,13 +332,13 @@ export function InspectionReportCard({
                   setAuthPassword(""); setAuthError(false); setShowAuthModal(true);
                 }
               }}
-              className={`cursor-pointer px-3 py-1 rounded-lg text-[9px] font-black uppercase transition-all border ${
+              className={`cursor-pointer rounded-xl font-black uppercase transition-all border ${
                 editMode
-                  ? "bg-amber-100 text-amber-700 border-amber-300 hover:bg-amber-200"
-                  : "bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200"
+                  ? "px-4 py-2 text-[10px] bg-amber-500 text-white border-amber-600 hover:bg-amber-600 shadow-lg animate-pulse"
+                  : "px-3 py-1 text-[9px] bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200"
               }`}
             >
-              {editMode ? "✓ SALIR EDICIÓN" : "✏️ EDITAR"}
+              {editMode ? "⚠ SALIR DE EDICIÓN" : "✏️ EDITAR"}
             </span>
           )}
           <svg className={`w-4 h-4 text-slate-400 transition-transform ml-1 ${isCardCollapsed ? "" : "rotate-180"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -461,8 +458,8 @@ export function InspectionReportCard({
           finding={localViewFinding}
           sectionName={sections.find(s => s.zoneIds.includes(localViewFinding.zone_id || ""))?.name}
           onClose={() => setLocalViewFinding(null)}
-          onSave={async (description, itemLabel) => {
-            await onUpdateFinding(localViewFinding.id, description, itemLabel);
+          onSave={async (description) => {
+            await onUpdateFinding(localViewFinding.id, description, localViewFinding.item_label);
             setLocalViewFinding(null);
           }}
         />
@@ -481,18 +478,17 @@ function EditableFindingViewModal({
   finding: Finding;
   sectionName?: string;
   onClose: () => void;
-  onSave: (description: string, itemLabel: string) => Promise<void>;
+  onSave: (description: string) => Promise<void>;
 }) {
   const isClosed = finding.is_closed === true || (finding as any).is_closed === "true";
   const [isEditing, setIsEditing]     = useState(false);
   const [description, setDescription] = useState(finding.description);
-  const [itemLabel, setItemLabel]     = useState(finding.item_label);
   const [isSaving, setIsSaving]       = useState(false);
 
   const handleSave = async () => {
-    if (!description.trim() || !itemLabel.trim()) return;
+    if (!description.trim()) return;
     setIsSaving(true);
-    await onSave(description.trim(), itemLabel.trim());
+    await onSave(description.trim());
     setIsSaving(false);
   };
 
@@ -509,15 +505,17 @@ function EditableFindingViewModal({
             </div>
             {sectionName && <p className="text-sm font-black text-slate-700 mt-2"><span className="text-slate-400 font-bold text-sm">Sección:</span> {sectionName}</p>}
             {finding.zone_name && <p className="text-sm font-black text-slate-700 mt-1"><span className="text-slate-400 font-bold text-sm">Zona:</span> 📍 {finding.zone_name}</p>}
+            {/* Referencia del hallazgo — solo lectura, no editable */}
+            <h3 className="text-base font-black text-slate-800 mt-2 leading-tight">{finding.item_label}</h3>
           </div>
           <button onClick={onClose} className="w-8 h-8 bg-white border rounded-lg flex items-center justify-center text-slate-400 shrink-0">✕</button>
         </div>
 
         <div className="p-5 overflow-y-auto flex-1 space-y-4">
-          {/* Título / item_label editable */}
+          {/* Descripción editable */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Hallazgo:</p>
+              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Comentario del usuario:</p>
               {!isEditing && (
                 <button
                   onClick={() => setIsEditing(true)}
@@ -526,24 +524,16 @@ function EditableFindingViewModal({
               )}
             </div>
             {isEditing ? (
-              <div className="space-y-2">
-                <input
-                  value={itemLabel}
-                  onChange={e => setItemLabel(e.target.value)}
-                  placeholder="Título del hallazgo"
-                  className="w-full px-3 py-2 bg-slate-50 border-2 border-amber-300 rounded-xl text-sm font-black outline-none focus:border-amber-500"
-                />
-                <textarea
-                  value={description}
-                  onChange={e => setDescription(e.target.value)}
-                  rows={4}
-                  placeholder="Descripción del hallazgo"
-                  className="w-full px-3 py-2.5 bg-slate-50 border-2 border-amber-300 rounded-xl text-sm outline-none focus:border-amber-500 resize-none"
-                />
-              </div>
+              <textarea
+                autoFocus
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+                rows={4}
+                placeholder="Descripción del hallazgo"
+                className="w-full px-3 py-2.5 bg-slate-50 border-2 border-amber-300 rounded-xl text-sm outline-none focus:border-amber-500 resize-none"
+              />
             ) : (
               <div className="bg-slate-50 p-4 rounded-xl border-l-4 border-slate-300">
-                <p className="text-xs font-black text-slate-700 mb-1">{itemLabel}</p>
                 <p className="text-sm text-slate-700 italic">"{description}"</p>
               </div>
             )}
@@ -595,9 +585,9 @@ function EditableFindingViewModal({
           <button onClick={onClose} className="flex-1 py-3 border-2 border-slate-200 rounded-xl font-black text-xs uppercase text-slate-500">CERRAR</button>
           {isEditing && (
             <button
-              disabled={!description.trim() || !itemLabel.trim() || isSaving}
+              disabled={!description.trim() || isSaving}
               onClick={handleSave}
-              className={`flex-1 py-3 rounded-xl font-black text-xs uppercase text-white transition-all ${description.trim() && itemLabel.trim() && !isSaving ? "bg-amber-500 hover:bg-amber-600 shadow" : "bg-slate-300"}`}
+              className={`flex-1 py-3 rounded-xl font-black text-xs uppercase text-white transition-all ${description.trim() && !isSaving ? "bg-amber-500 hover:bg-amber-600 shadow" : "bg-slate-300"}`}
             >
               {isSaving ? "GUARDANDO..." : "💾 GUARDAR CAMBIOS"}
             </button>
@@ -607,5 +597,6 @@ function EditableFindingViewModal({
     </div>
   );
 }
+
 
 
