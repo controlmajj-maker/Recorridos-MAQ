@@ -435,10 +435,223 @@ export function ClosureModal({ finding, sectionName, onClose, onConfirm }: {
   finding: Finding;
   sectionName?: string;
   onClose: () => void;
-  onConfirm: (id: string, correctiveActions: string) => void;
+  onConfirm: (id: string, correctiveActions: string, closurePhotoUrl?: string) => void;
 }) {
   const [actions, setActions] = useState("");
   const [zoomPhoto, setZoomPhoto] = useState(false);
+  const [zoomClosurePhoto, setZoomClosurePhoto] = useState(false);
+
+  // Closure photo state
+  const [closureFile, setClosureFile] = useState<File | null>(null);
+  const [closurePreview, setClosurePreview] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const closureFileRef = useRef<HTMLInputElement>(null);
+
+  const canSubmit = actions.trim() && closurePreview;
+
+  const handleConfirm = async () => {
+    if (!canSubmit) return;
+    setIsUploading(true);
+    let closurePhotoUrl: string | undefined;
+    if (closureFile) {
+      const formData = new FormData();
+      formData.append("file", closureFile);
+      const res = await fetch("/api/upload", { method: "POST", body: formData });
+      const data = await res.json();
+      closurePhotoUrl = data.url;
+    }
+    setIsUploading(false);
+    onConfirm(finding.id, actions, closurePhotoUrl);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/90 backdrop-blur flex items-center justify-center z-[120] p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md border-4 border-green-50 overflow-hidden flex flex-col max-h-[92vh]">
+
+        {/* ── Encabezado ── */}
+        <div className="p-5 bg-green-50 border-b shrink-0">
+          <span className="text-[9px] font-black uppercase text-green-600 bg-green-100 px-2 py-0.5 rounded tracking-widest">Protocolo de Cierre</span>
+          {sectionName && (
+            <p className="text-sm font-black text-slate-700 mt-2">
+              <span className="text-slate-400 font-bold text-sm">Sección:</span> {sectionName}
+            </p>
+          )}
+          {finding.zone_name && (
+            <p className="text-sm font-black text-slate-700 mt-1">
+              <span className="text-slate-400 font-bold text-sm">Zona:</span> 📍 {finding.zone_name}
+            </p>
+          )}
+          <h3 className="text-2xl font-black text-slate-800 mt-3">Cerrar Hallazgo</h3>
+        </div>
+
+        {/* ── Cuerpo scrollable ── */}
+        <div className="overflow-y-auto flex-1 p-5 space-y-4">
+
+          {/* Descripción del hallazgo */}
+          <div className="bg-slate-50 p-3 rounded-xl border">
+            <p className="text-[9px] font-black text-slate-400 uppercase mb-1 tracking-widest">Descripción del Hallazgo:</p>
+            <p className="text-sm text-slate-700 italic">"{finding.description}"</p>
+          </div>
+
+          {/* Foto de evidencia original */}
+          {finding.photo_url && (
+            <div>
+              <p className="text-[9px] font-black text-slate-400 uppercase mb-1.5 tracking-widest">Evidencia Original:</p>
+              <div
+                className="relative rounded-xl overflow-hidden border-2 border-slate-100 cursor-zoom-in"
+                onClick={() => setZoomPhoto(true)}
+              >
+                <img src={finding.photo_url} alt="Evidencia" className="w-full max-h-48 object-cover" />
+                <div className="absolute bottom-0 inset-x-0 bg-black/40 text-center py-1">
+                  <p className="text-[8px] font-black text-white uppercase tracking-widest">Toca para ampliar</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Corrección IA */}
+          {(() => {
+            const corrLine = finding.ai_analysis?.split("\n").find(l => l.startsWith("✏️"));
+            const corrText = corrLine ? corrLine.replace("✏️ Corrección IA: ", "") : null;
+            if (!corrText) return null;
+            return (
+              <div className="border-2 border-blue-200 bg-blue-50 rounded-xl p-4">
+                <p className="text-[9px] font-black text-blue-700 uppercase tracking-widest mb-1.5">✏️ Corrección IA</p>
+                <p className="text-xs text-blue-800 leading-relaxed">{corrText}</p>
+              </div>
+            );
+          })()}
+
+          {/* Recomendaciones */}
+          {(() => {
+            const recLine = finding.ai_analysis?.split("\n").find(l => l.startsWith("💡"));
+            const recText = recLine ? recLine.replace("💡 Recomendación: ", "") : null;
+            return (
+              <div className={`border-2 rounded-xl p-4 ${recText ? "bg-cyan-50 border-cyan-200" : "bg-blue-50 border-blue-100"}`}>
+                <p className={`text-[9px] font-black uppercase tracking-widest mb-2 ${recText ? "text-cyan-700" : "text-blue-600"}`}>
+                  💡 Recomendación IA
+                </p>
+                {recText
+                  ? <p className="text-xs text-cyan-900 leading-relaxed">{recText}</p>
+                  : <p className="text-xs text-blue-400 italic">Sin recomendaciones disponibles por el momento.</p>
+                }
+              </div>
+            );
+          })()}
+
+          {/* Acciones Correctivas */}
+          <div>
+            <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">
+              Acciones Correctivas <span className="text-red-500">(Obligatorio)</span>
+            </label>
+            <textarea
+              rows={4}
+              value={actions}
+              onChange={e => setActions(e.target.value)}
+              placeholder="Describe cómo se solucionó el riesgo..."
+              className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-green-500 outline-none text-sm resize-none transition-all"
+            />
+          </div>
+
+          {/* Foto de cierre — OBLIGATORIA */}
+          <div>
+            <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">
+              Evidencia de Cierre <span className="text-red-500">(Obligatoria)</span>
+            </label>
+            <div
+              onClick={() => closureFileRef.current?.click()}
+              className={`relative rounded-xl overflow-hidden border-4 border-dashed cursor-pointer transition-all ${
+                closurePreview
+                  ? "border-green-300"
+                  : "border-slate-200 hover:border-green-400"
+              }`}
+            >
+              {closurePreview ? (
+                <div className="relative">
+                  <img src={closurePreview} alt="Evidencia de cierre" className="w-full max-h-52 object-cover" />
+                  <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                    <p className="text-white font-black text-xs uppercase bg-black/50 px-3 py-1.5 rounded-lg">Cambiar foto</p>
+                  </div>
+                  <div className="absolute top-2 right-2 bg-green-600 text-white text-[8px] font-black uppercase px-2 py-0.5 rounded-full">
+                    ✓ Foto lista
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-8 gap-2">
+                  <div className="w-12 h-12 bg-green-50 rounded-2xl flex items-center justify-center">
+                    <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  </div>
+                  <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Capturar / Subir foto</p>
+                  <p className="text-[9px] text-slate-400">Evidencia de que el problema fue resuelto</p>
+                </div>
+              )}
+              <input
+                ref={closureFileRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={e => {
+                  const f = e.target.files?.[0];
+                  if (f) {
+                    setClosureFile(f);
+                    const r = new FileReader();
+                    r.onloadend = () => setClosurePreview(r.result as string);
+                    r.readAsDataURL(f);
+                  }
+                }}
+              />
+            </div>
+            {!closurePreview && (
+              <p className="text-[9px] text-amber-600 font-bold mt-1.5 flex items-center gap-1">
+                <span>⚠</span> Se requiere foto de evidencia para validar el cierre
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* ── Footer ── */}
+        <div className="p-5 bg-slate-50 border-t flex gap-3 shrink-0">
+          <button onClick={onClose} className="flex-1 py-3 border-2 border-slate-200 rounded-xl font-black text-xs uppercase text-slate-400">CANCELAR</button>
+          <button
+            disabled={!canSubmit || isUploading}
+            onClick={handleConfirm}
+            className={`flex-1 py-3 rounded-xl font-black text-xs uppercase text-white transition-all flex items-center justify-center gap-2 ${canSubmit && !isUploading ? "bg-green-600 hover:bg-green-700 shadow-lg" : "bg-slate-300"}`}
+          >
+            {isUploading
+              ? <><div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> SUBIENDO...</>
+              : "VALIDAR CIERRE"
+            }
+          </button>
+        </div>
+      </div>
+
+      {/* Zoom foto original */}
+      {zoomPhoto && finding.photo_url && (
+        <div
+          className="fixed inset-0 z-[200] bg-black/95 flex items-center justify-center p-4 cursor-zoom-out"
+          onClick={() => setZoomPhoto(false)}
+        >
+          <img src={finding.photo_url} alt="Evidencia ampliada" className="max-w-full max-h-full object-contain rounded-xl" />
+        </div>
+      )}
+
+      {/* Zoom foto cierre */}
+      {zoomClosurePhoto && closurePreview && (
+        <div
+          className="fixed inset-0 z-[200] bg-black/95 flex items-center justify-center p-4 cursor-zoom-out"
+          onClick={() => setZoomClosurePhoto(false)}
+        >
+          <img src={closurePreview} alt="Evidencia de cierre ampliada" className="max-w-full max-h-full object-contain rounded-xl" />
+        </div>
+      )}
+    </div>
+  );
+}
+
 
   return (
     <div className="fixed inset-0 bg-slate-900/90 backdrop-blur flex items-center justify-center z-[120] p-4">
@@ -484,75 +697,6 @@ export function ClosureModal({ finding, sectionName, onClose, onConfirm }: {
               </div>
             </div>
           )}
-
-          {/* Corrección IA */}
-          {(() => {
-            const corrLine = finding.ai_analysis?.split("\n").find(l => l.startsWith("✏️"));
-            const corrText = corrLine ? corrLine.replace("✏️ Corrección IA: ", "") : null;
-            if (!corrText) return null;
-            return (
-              <div className="border-2 border-blue-200 bg-blue-50 rounded-xl p-4">
-                <p className="text-[9px] font-black text-blue-700 uppercase tracking-widest mb-1.5">✏️ Corrección IA</p>
-                <p className="text-xs text-blue-800 leading-relaxed">{corrText}</p>
-              </div>
-            );
-          })()}
-
-          {/* Recomendaciones */}
-          {(() => {
-            const recLine = finding.ai_analysis?.split("\n").find(l => l.startsWith("💡"));
-            const recText = recLine ? recLine.replace("💡 Recomendación: ", "") : null;
-            return (
-              <div className={`border-2 rounded-xl p-4 ${recText ? "bg-cyan-50 border-cyan-200" : "bg-blue-50 border-blue-100"}`}>
-                <p className={`text-[9px] font-black uppercase tracking-widest mb-2 ${recText ? "text-cyan-700" : "text-blue-600"}`}>
-                  💡 Recomendación IA
-                </p>
-                {recText
-                  ? <p className="text-xs text-cyan-900 leading-relaxed">{recText}</p>
-                  : <p className="text-xs text-blue-400 italic">Sin recomendaciones disponibles por el momento.</p>
-                }
-              </div>
-            );
-          })()}
-
-          {/* Acciones Correctivas */}
-          <div>
-            <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Acciones Correctivas <span className="text-red-500">(Obligatorio)</span></label>
-            <textarea
-              rows={4}
-              value={actions}
-              onChange={e => setActions(e.target.value)}
-              placeholder="Describe cómo se solucionó el riesgo..."
-              className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-green-500 outline-none text-sm resize-none transition-all"
-            />
-          </div>
-        </div>
-
-        {/* ── Footer ── */}
-        <div className="p-5 bg-slate-50 border-t flex gap-3 shrink-0">
-          <button onClick={onClose} className="flex-1 py-3 border-2 border-slate-200 rounded-xl font-black text-xs uppercase text-slate-400">CANCELAR</button>
-          <button
-            disabled={!actions.trim()}
-            onClick={() => onConfirm(finding.id, actions)}
-            className={`flex-1 py-3 rounded-xl font-black text-xs uppercase text-white transition-all ${!actions.trim() ? "bg-slate-300" : "bg-green-600 hover:bg-green-700 shadow-lg"}`}
-          >
-            VALIDAR CIERRE
-          </button>
-        </div>
-      </div>
-
-      {/* Zoom foto */}
-      {zoomPhoto && finding.photo_url && (
-        <div
-          className="fixed inset-0 z-[200] bg-black/95 flex items-center justify-center p-4 cursor-zoom-out"
-          onClick={() => setZoomPhoto(false)}
-        >
-          <img src={finding.photo_url} alt="Evidencia ampliada" className="max-w-full max-h-full object-contain rounded-xl" />
-        </div>
-      )}
-    </div>
-  );
-}
 
 // ─── Finding View Modal ───────────────────────────────────────────────────────
 export function FindingViewModal({ finding, sectionName, onClose, onImageZoom }: {
@@ -633,6 +777,18 @@ export function FindingViewModal({ finding, sectionName, onClose, onImageZoom }:
             <div className="bg-green-50 p-4 rounded-xl border-2 border-green-100">
               <p className="text-[9px] font-black text-green-600 uppercase mb-1">✅ Acciones Correctivas:</p>
               <p className="text-sm text-slate-700">{finding.corrective_actions}</p>
+              {finding.closure_photo_url && (
+                <div className="mt-3">
+                  <p className="text-[9px] font-black text-green-600 uppercase mb-1.5">📸 Evidencia de Cierre:</p>
+                  <div
+                    className="cursor-zoom-in rounded-xl overflow-hidden border-2 border-green-200 shadow-sm"
+                    onClick={() => onImageZoom?.(finding.closure_photo_url!)}
+                  >
+                    <img src={finding.closure_photo_url} alt="Evidencia de cierre" className="w-full object-cover max-h-48" />
+                    <p className="text-center text-[8px] text-green-600 py-1 bg-green-50 font-black uppercase">Toca para ampliar</p>
+                  </div>
+                </div>
+              )}
               {finding.closed_at && (
                 <p className="text-sm font-black text-blue-600 mt-2">
                   Cerrado el {new Date(finding.closed_at).toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" })}

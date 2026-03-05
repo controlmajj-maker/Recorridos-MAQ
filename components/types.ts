@@ -18,6 +18,7 @@ export interface Finding {
   ai_analysis?: string;
   is_closed: boolean;
   corrective_actions?: string;
+  closure_photo_url?: string;
   closed_at?: string;
   created_at: string;
 }
