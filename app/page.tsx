@@ -626,14 +626,60 @@ Responde en texto plano en español, sin markdown, sin asteriscos, sin símbolos
   }
 
   async function handleDeleteFinding(findingId: string) {
-    await fetch("/api/findings", {
+    // 1. Borrar el hallazgo — la API devuelve inspection_id y zone_id
+    const delRes = await fetch("/api/findings", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: findingId }),
     });
+    const delData = await delRes.json();
+    const affectedInspectionId: string | null = delData.inspection_id ?? null;
+
+    // 2. Recargar todos los findings
     const finRes = await fetch("/api/findings");
     const finData = await finRes.json();
-    setAllFindings(Array.isArray(finData) ? finData : []);
+    const updatedFindings: Finding[] = Array.isArray(finData) ? finData : [];
+    setAllFindings(updatedFindings);
+
+    // 3. Si tenemos la inspección afectada, recalcular el status de cada zona y persistir
+    if (affectedInspectionId) {
+      // Obtener la inspección actual (con su zones_data actual)
+      const inspRes = await fetch("/api/inspections");
+      const inspData = await inspRes.json();
+      const inspList: Inspection[] = Array.isArray(inspData) ? inspData : [];
+      const targetInsp = inspList.find((i: Inspection) => i.id === affectedInspectionId);
+
+      if (targetInsp && Array.isArray(targetInsp.zones_data) && targetInsp.zones_data.length > 0) {
+        // Findings restantes para esta inspección
+        const remainingFindings = updatedFindings.filter(f => f.inspection_id === affectedInspectionId);
+
+        // Recalcular status: una zona es ISSUE si tiene findings restantes, OK si fue evaluada y ya no tiene findings
+        const updatedZonesData = (targetInsp.zones_data as Zone[]).map(z => {
+          const zoneFindings = remainingFindings.filter(f => f.zone_id === z.id);
+          if (zoneFindings.length > 0) {
+            // Sigue teniendo hallazgos
+            return { ...z, status: "ISSUE" as ZoneStatus };
+          } else if (z.status === "ISSUE") {
+            // Tenía hallazgos pero ya no — pasa a OK (la zona fue evaluada)
+            return { ...z, status: "OK" as ZoneStatus };
+          }
+          // PENDING o OK sin cambio
+          return z;
+        });
+
+        // Persistir zones_data actualizado
+        await fetch("/api/inspections", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: affectedInspectionId, zones_data: updatedZonesData }),
+        });
+      }
+
+      // 4. Recargar inspecciones para que ExecutiveSummary reciba zonesData actualizado
+      const freshInspRes = await fetch("/api/inspections");
+      const freshInspData = await freshInspRes.json();
+      setInspections(Array.isArray(freshInspData) ? freshInspData : []);
+    }
   }
 
   async function handleUpdateFinding(findingId: string, description: string, itemLabel: string) {
