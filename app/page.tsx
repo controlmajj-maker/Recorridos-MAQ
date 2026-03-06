@@ -536,7 +536,34 @@ export default function SegurMapApp() {
       }
     } catch { /* si falla la recarga, continúa con estado local */ }
 
+    // ── Paso 1b: reconciliación de zonas ────────────────────────────────────
+    // Corrige zonas con hallazgos guardados por usuarios que nunca pulsaron
+    // "Validar Zona". Regla:
+    //   • PENDING + tiene hallazgos  → ISSUE  (zona con problemas sin validar)
+    //   • PENDING + sin hallazgos    → se deja PENDING (zona no evaluada)
+    // Se persiste en DB para que el reporte refleje el estado real.
     const findingsForInspection = freshFindings.filter(f => f.inspection_id === currentInspection.id);
+
+    const zonesNeedingReconciliation = freshZonesData.filter(z => {
+      if (z.status !== "PENDING") return false; // solo zonas pendientes
+      return findingsForInspection.some(f => f.zone_id === z.id);
+    });
+
+    if (zonesNeedingReconciliation.length > 0) {
+      console.log(`[handleFinishInspection] reconciliando ${zonesNeedingReconciliation.length} zona(s) PENDING con hallazgos`);
+      freshZonesData = freshZonesData.map(z => {
+        if (z.status !== "PENDING") return z;
+        const hasFindings = findingsForInspection.some(f => f.zone_id === z.id);
+        return hasFindings ? { ...z, status: "ISSUE" as ZoneStatus } : z;
+      });
+      // Persistir zonas reconciliadas antes de generar el reporte
+      await fetch("/api/inspections", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: currentInspection.id, zones_data: freshZonesData }),
+      }).catch(() => {});
+    }
+
     const okZones = freshZonesData.filter(z => z.status === "OK");
     const issueZones = freshZonesData.filter(z => z.status === "ISSUE");
     const pendingZonesCount = freshZonesData.filter(z => z.status === "PENDING").length;
