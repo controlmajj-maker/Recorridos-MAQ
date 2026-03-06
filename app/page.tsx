@@ -239,6 +239,40 @@ export default function SegurMapApp() {
 
   useEffect(() => { loadData(); }, []); // eslint-disable-line
 
+  // ── Polling: cuando hay inspección activa, verificar is_finishing cada 5s ──
+  // Esto garantiza que los dispositivos secundarios se enteren del estado real de la DB.
+  useEffect(() => {
+    if (!isInspectionActive) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch("/api/inspections");
+        if (!res.ok) return;
+        const data: any[] = await res.json();
+        const active = Array.isArray(data) ? data.find((i: any) => i.is_active === true) : null;
+        if (!active) {
+          // La inspección ya terminó — recargar todo
+          await loadData();
+          return;
+        }
+        // Actualizar currentInspection con el estado fresco de DB (incluye is_finishing)
+        setCurrentInspection(prev => {
+          if (!prev) return prev;
+          const freshIsFinishing = active.is_finishing === true;
+          const prevIsFinishing = (prev as any).is_finishing === true;
+          if (freshIsFinishing !== prevIsFinishing) {
+            // Si ahora está generando y este dispositivo no es el owner, cerrar modal de zona
+            if (freshIsFinishing) {
+              setSelectedZone(null);
+            }
+            return { ...prev, is_finishing: freshIsFinishing } as any;
+          }
+          return prev;
+        });
+      } catch { /* polling silencioso — no interrumpir al usuario */ }
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [isInspectionActive, loadData]);
+
   // ─── Persist config to DB ────────────────────────────────────────────────
   const saveConfig = useCallback(async (patch: Record<string, string | number>) => {
     try {
@@ -1018,6 +1052,7 @@ Responde en texto plano en español, sin markdown, sin asteriscos, sin símbolos
             f.inspection_id === currentInspection.id &&
             f.zone_id === selectedZone.id
           )}
+          isInspectionFinishing={(currentInspection as any)?.is_finishing === true}
           onClose={() => setSelectedZone(null)}
           onSave={async (zoneId, zoneName, status, checklistResults, findings) => {
             await handleZoneSave(zoneId, zoneName, status, checklistResults, findings);
@@ -1025,6 +1060,21 @@ Responde en texto plano en español, sin markdown, sin asteriscos, sin símbolos
           onFindingSaved={async (zoneId, inspectionId) => {
             // Guard: no actualizar si el reporte ya se está generando
             if ((currentInspection as any)?.is_finishing) return;
+
+            // Verificar estado fresco en DB (cubre el caso de que el polling aún no haya llegado)
+            try {
+              const chk = await fetch("/api/inspections");
+              if (chk.ok) {
+                const chkData: any[] = await chk.json();
+                const freshInsp = chkData.find((i: any) => i.id === currentInspection?.id);
+                if (freshInsp?.is_finishing || freshInsp?.is_active === false) {
+                  // Actualizar estado local para que el banner aparezca de inmediato
+                  setCurrentInspection((prev: any) => prev ? { ...prev, is_finishing: true } : prev);
+                  setSelectedZone(null);
+                  return;
+                }
+              }
+            } catch { /* si falla el check, continuar normalmente */ }
 
             // 1. Actualizar zona a ISSUE en estado local (sin side effects en setter)
             setZones(prev =>
@@ -1272,9 +1322,22 @@ Responde en texto plano en español, sin markdown, sin asteriscos, sin símbolos
                   type="password"
                   value={recoverPassword}
                   onChange={e => { setRecoverPassword(e.target.value); setRecoverPasswordError(false); }}
-                  onKeyDown={e => {
+                  onKeyDown={async e => {
                     if (e.key === "Enter") {
                       if (recoverPassword === "admin" && currentInspection) {
+                        // Verificar en DB si ya se está generando el reporte
+                        try {
+                          const chk = await fetch("/api/inspections");
+                          const chkData: any[] = await chk.json();
+                          const freshInsp = chkData.find((i: any) => i.id === currentInspection.id);
+                          if (freshInsp?.is_finishing) {
+                            // Reporte ya en curso — actualizar estado y mostrar banner
+                            setCurrentInspection((prev: any) => prev ? { ...prev, is_finishing: true } : prev);
+                            setShowRecoverOwnership(false);
+                            setRecoverPassword("");
+                            return;
+                          }
+                        } catch { /* si falla el check, continuar normalmente */ }
                         if (typeof window !== "undefined") localStorage.setItem("ownerInspectionId", currentInspection.id);
                         setIsOwner(true);
                         setShowRecoverOwnership(false);
@@ -1300,8 +1363,21 @@ Responde en texto plano en español, sin markdown, sin asteriscos, sin símbolos
                   CANCELAR
                 </button>
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     if (recoverPassword === "admin" && currentInspection) {
+                      // Verificar en DB si ya se está generando el reporte
+                      try {
+                        const chk = await fetch("/api/inspections");
+                        const chkData: any[] = await chk.json();
+                        const freshInsp = chkData.find((i: any) => i.id === currentInspection.id);
+                        if (freshInsp?.is_finishing) {
+                          // Reporte ya en curso — actualizar estado y mostrar banner en lugar de dar control
+                          setCurrentInspection((prev: any) => prev ? { ...prev, is_finishing: true } : prev);
+                          setShowRecoverOwnership(false);
+                          setRecoverPassword("");
+                          return;
+                        }
+                      } catch { /* si falla el check, continuar normalmente */ }
                       if (typeof window !== "undefined") localStorage.setItem("ownerInspectionId", currentInspection.id);
                       setIsOwner(true);
                       setShowRecoverOwnership(false);
