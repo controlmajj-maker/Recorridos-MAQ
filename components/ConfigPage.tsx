@@ -515,29 +515,6 @@ export function ConfigPage({
         </div>
       </div>
 
-      {/* ── Eliminar Historial ── */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-slate-100 flex items-center gap-3">
-          <div className="w-8 h-8 bg-red-100 rounded-xl flex items-center justify-center">⚠️</div>
-          <div>
-            <h3 className="font-black text-slate-800 text-sm">Eliminar Historial Completo</h3>
-            <p className="text-[9px] text-red-400 font-bold uppercase">Acción irreversible</p>
-          </div>
-        </div>
-        <div className="p-4">
-          <div className="bg-red-50 border-2 border-red-100 rounded-2xl p-4">
-            <p className="text-[10px] font-black text-red-600 uppercase tracking-wide mb-2">
-              Se eliminarán todas las auditorías realizadas, junto con hallazgos e imágenes registradas.
-            </p>
-            <p className="text-[10px] text-slate-500 mb-3">Esta acción no se puede deshacer.</p>
-            <button onClick={() => setShowDeleteConfirm(true)}
-              className="w-full py-3 bg-red-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-red-700 shadow-lg">
-              🗑 BORRAR TODO EL HISTORIAL
-            </button>
-          </div>
-        </div>
-      </div>
-
       {/* ── Auditorías Registradas ── */}
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
         <div className="p-4 border-b border-slate-100 flex items-center gap-3">
@@ -590,6 +567,29 @@ export function ConfigPage({
               })}
             </div>
           )}
+        </div>
+      </div>
+
+      {/* ── Eliminar Historial ── */}
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+        <div className="p-4 border-b border-slate-100 flex items-center gap-3">
+          <div className="w-8 h-8 bg-red-100 rounded-xl flex items-center justify-center">⚠️</div>
+          <div>
+            <h3 className="font-black text-slate-800 text-sm">Eliminar Historial Completo</h3>
+            <p className="text-[9px] text-red-400 font-bold uppercase">Acción irreversible</p>
+          </div>
+        </div>
+        <div className="p-4">
+          <div className="bg-red-50 border-2 border-red-100 rounded-2xl p-4">
+            <p className="text-[10px] font-black text-red-600 uppercase tracking-wide mb-2">
+              Se eliminarán todas las auditorías realizadas, junto con hallazgos e imágenes registradas.
+            </p>
+            <p className="text-[10px] text-slate-500 mb-3">Esta acción no se puede deshacer.</p>
+            <button onClick={() => setShowDeleteConfirm(true)}
+              className="w-full py-3 bg-red-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-red-700 shadow-lg">
+              🗑 BORRAR TODO EL HISTORIAL
+            </button>
+          </div>
         </div>
       </div>
 

@@ -210,7 +210,19 @@ export function InspectionModal({ zone, inspectionId, existingFindings, onClose,
             if (!key.startsWith("manual_")) {
               setResults(prev => ({ ...prev, [key]: false }));
             }
-            setFindings(prev => ({ ...prev, [key]: { ...finding, id: `local_${Date.now()}`, created_at: new Date().toISOString() } as Finding }));
+            // Persistir inmediatamente en DB para no perder datos al refrescar
+            try {
+              const res = await fetch("/api/findings", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ...finding, zone_id: zone.id }),
+              });
+              const saved = await res.json();
+              setFindings(prev => ({ ...prev, [key]: { ...finding, id: saved.id, created_at: saved.created_at } as Finding }));
+            } catch {
+              // Fallback local si falla la red
+              setFindings(prev => ({ ...prev, [key]: { ...finding, id: `local_${Date.now()}`, created_at: new Date().toISOString() } as Finding }));
+            }
             setItemToReport(null);
           }}
           onClear={() => {
