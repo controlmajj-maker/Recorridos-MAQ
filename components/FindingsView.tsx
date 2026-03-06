@@ -198,7 +198,14 @@ export function FindingsView({
                     <div className="h-px flex-1 bg-slate-200" />
                   </button>
 
-                  {!dateCollapsed && Array.from(bySec.entries()).map(([secKey, { secName, byZone }]) => {
+                  {!dateCollapsed && (() => {
+                    const secOrder = sections.map(s => s.id);
+                    const sortedSecEntries = Array.from(bySec.entries()).sort(([aKey], [bKey]) => {
+                      const aIdx = aKey === "__sin_seccion__" ? Infinity : secOrder.indexOf(aKey);
+                      const bIdx = bKey === "__sin_seccion__" ? Infinity : secOrder.indexOf(bKey);
+                      return (aIdx === -1 ? Infinity : aIdx) - (bIdx === -1 ? Infinity : bIdx);
+                    });
+                    return sortedSecEntries.map(([secKey, { secName, byZone }]) => {
                     const secCollapsed = collapsedKeys.has(`sec:${dateLabel}:${secKey}`);
                     const secAllFindings = Array.from(byZone.values()).flatMap(({ findings: ff }) => ff);
                     const secTotal    = secAllFindings.length;
@@ -224,7 +231,15 @@ export function FindingsView({
                           </svg>
                         </button>
 
-                        {!secCollapsed && Array.from(byZone.entries()).map(([zoneKey, { zoneName, findings: zoneFindings }]) => {
+                        {!secCollapsed && (() => {
+                          const sec = sections.find(s => s.id === secKey);
+                          const zoneOrder = sec ? sec.zoneIds : [];
+                          const sortedZoneEntries = Array.from(byZone.entries()).sort(([aKey], [bKey]) => {
+                            const aIdx = aKey === "__sin_zona__" ? Infinity : zoneOrder.indexOf(aKey);
+                            const bIdx = bKey === "__sin_zona__" ? Infinity : zoneOrder.indexOf(bKey);
+                            return (aIdx === -1 ? Infinity : aIdx) - (bIdx === -1 ? Infinity : bIdx);
+                          });
+                          return sortedZoneEntries.map(([zoneKey, { zoneName, findings: zoneFindings }]) => {
                           const zoneCollapsed = collapsedKeys.has(`zone:${dateLabel}:${secKey}:${zoneKey}`);
                           const zoneResueltos  = zoneFindings.filter(f => f.is_closed === true || (f as any).is_closed === "true").length;
                           const zonePendientes = zoneFindings.length - zoneResueltos;
@@ -254,10 +269,12 @@ export function FindingsView({
                               )}
                             </div>
                           );
-                        })}
+                        });
+                        })()} 
                       </div>
                     );
-                  })}
+                  });
+                  })()} 
                 </div>
               );
             })}

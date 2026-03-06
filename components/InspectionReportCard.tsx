@@ -166,9 +166,18 @@ function FindingsSection({
               secEntry.byZone.get(zoneKey)!.findings.push(f);
             }
 
+            // Ordenar secciones según el orden definido en sections prop,
+            // con hallazgos sin sección al final (igual que CurrentView y ConfigPage).
+            const secOrder = sections.map(s => s.id);
+            const sortedSecEntries = Array.from(bySec.entries()).sort(([aKey], [bKey]) => {
+              const aIdx = aKey === "__sin_seccion__" ? Infinity : secOrder.indexOf(aKey);
+              const bIdx = bKey === "__sin_seccion__" ? Infinity : secOrder.indexOf(bKey);
+              return (aIdx === -1 ? Infinity : aIdx) - (bIdx === -1 ? Infinity : bIdx);
+            });
+
             return (
               <div className="space-y-3">
-                {Array.from(bySec.entries()).map(([secKey, { secName, byZone }]) => {
+                {sortedSecEntries.map(([secKey, { secName, byZone }]) => {
                   const secCollapsed  = collapsedKeys.has(`${keyPrefix}:sec:${secKey}`);
                   const secAllF       = Array.from(byZone.values()).flatMap(({ findings: ff }) => ff);
                   const secResueltos  = secAllF.filter(f => f.is_closed === true || (f as any).is_closed === "true").length;
@@ -193,42 +202,53 @@ function FindingsSection({
 
                       {!secCollapsed && (
                         <div className="px-3 pb-3 pt-2 space-y-3 bg-white">
-                          {Array.from(byZone.entries()).map(([zoneKey, { zoneName, findings: zoneFindings }]) => {
-                            const zoneCollapsed  = collapsedKeys.has(`${keyPrefix}:zone:${secKey}:${zoneKey}`);
-                            const zoneResueltos  = zoneFindings.filter(f => f.is_closed === true || (f as any).is_closed === "true").length;
-                            const zonePendientes = zoneFindings.length - zoneResueltos;
-                            return (
-                              <div key={zoneKey} className="space-y-2">
-                                <button
-                                  onClick={e => { e.stopPropagation(); toggleKey(`${keyPrefix}:zone:${secKey}:${zoneKey}`); }}
-                                  className="w-full flex items-center gap-2 pl-1 group"
-                                >
-                                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">📍 {zoneName}</span>
-                                  <div className="flex items-center gap-1 shrink-0">
-                                    {zonePendientes > 0 && <span className="text-[8px] font-black text-red-600 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded-full">{zonePendientes} pend.</span>}
-                                    {zoneResueltos  > 0 && <span className="text-[8px] font-black text-green-600 bg-green-50 border border-green-200 px-1.5 py-0.5 rounded-full">{zoneResueltos} resuel.</span>}
-                                  </div>
-                                  <div className="h-px flex-1 bg-slate-100" />
-                                  <svg className={`w-3 h-3 text-slate-300 transition-transform ${zoneCollapsed ? "" : "rotate-180"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                  </svg>
-                                </button>
-                                {!zoneCollapsed && (
-                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                    {zoneFindings.map(f => (
-                                      <FindingMiniCard
-                                        key={f.id}
-                                        f={f}
-                                        onView={onViewFinding}
-                                        editMode={editMode}
-                                        onRequestDelete={onRequestDelete}
-                                      />
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
+                          {(() => {
+                            // Ordenar zonas según el orden definido en sections.zoneIds,
+                            // con zonas sin sección al final.
+                            const sec = sections.find(s => s.id === secKey);
+                            const zoneOrder = sec ? sec.zoneIds : [];
+                            const sortedZoneEntries = Array.from(byZone.entries()).sort(([aKey], [bKey]) => {
+                              const aIdx = aKey === "__sin_zona__" ? Infinity : zoneOrder.indexOf(aKey);
+                              const bIdx = bKey === "__sin_zona__" ? Infinity : zoneOrder.indexOf(bKey);
+                              return (aIdx === -1 ? Infinity : aIdx) - (bIdx === -1 ? Infinity : bIdx);
+                            });
+                            return sortedZoneEntries.map(([zoneKey, { zoneName, findings: zoneFindings }]) => {
+                              const zoneCollapsed  = collapsedKeys.has(`${keyPrefix}:zone:${secKey}:${zoneKey}`);
+                              const zoneResueltos  = zoneFindings.filter(f => f.is_closed === true || (f as any).is_closed === "true").length;
+                              const zonePendientes = zoneFindings.length - zoneResueltos;
+                              return (
+                                <div key={zoneKey} className="space-y-2">
+                                  <button
+                                    onClick={e => { e.stopPropagation(); toggleKey(`${keyPrefix}:zone:${secKey}:${zoneKey}`); }}
+                                    className="w-full flex items-center gap-2 pl-1 group"
+                                  >
+                                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">📍 {zoneName}</span>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      {zonePendientes > 0 && <span className="text-[8px] font-black text-red-600 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded-full">{zonePendientes} pend.</span>}
+                                      {zoneResueltos  > 0 && <span className="text-[8px] font-black text-green-600 bg-green-50 border border-green-200 px-1.5 py-0.5 rounded-full">{zoneResueltos} resuel.</span>}
+                                    </div>
+                                    <div className="h-px flex-1 bg-slate-100" />
+                                    <svg className={`w-3 h-3 text-slate-300 transition-transform ${zoneCollapsed ? "" : "rotate-180"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                  </button>
+                                  {!zoneCollapsed && (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                      {zoneFindings.map(f => (
+                                        <FindingMiniCard
+                                          key={f.id}
+                                          f={f}
+                                          onView={onViewFinding}
+                                          editMode={editMode}
+                                          onRequestDelete={onRequestDelete}
+                                        />
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            });
+                          })()}
                         </div>
                       )}
                     </div>
