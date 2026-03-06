@@ -52,26 +52,44 @@ export function FindingsView({
           return (
           <div key={f.id} className={`rounded-2xl shadow-lg border overflow-hidden flex flex-col ${closed ? "bg-green-50/40 border-green-200" : "bg-white border-slate-100"}`}>
             <div className={`p-4 border-b ${closed ? "bg-green-100/60 border-green-200" : "bg-red-50 border-red-100"}`}>
-              <div className="flex items-center gap-2 flex-wrap mb-1">
-                {closed
-                  ? <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full text-white bg-green-600">✓ RESUELTO</span>
-                  : <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full text-white ${f.severity === "high" ? "bg-red-600" : f.severity === "medium" ? "bg-orange-500" : "bg-yellow-500"}`}>
-                      {f.severity === "high" ? "ALTA" : f.severity === "medium" ? "MEDIA" : "BAJA"}
-                    </span>
-                }
-                {f.zone_name && (
-                  <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-slate-700 text-white">
-                    📍 {f.zone_name}
-                  </span>
-                )}
-                <span className="text-[9px] text-slate-400 font-bold ml-auto">{new Date(f.created_at).toLocaleDateString()}</span>
+              <div className="flex items-start gap-2">
+                {/* Lado izquierdo: badges + título + fecha cierre */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    {closed
+                      ? <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full text-white bg-green-600">✓ RESUELTO</span>
+                      : <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full text-white ${f.severity === "high" ? "bg-red-600" : f.severity === "medium" ? "bg-orange-500" : "bg-yellow-500"}`}>
+                          {f.severity === "high" ? "ALTA" : f.severity === "medium" ? "MEDIA" : "BAJA"}
+                        </span>
+                    }
+                    {f.zone_name && (
+                      <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-slate-700 text-white">
+                        📍 {f.zone_name}
+                      </span>
+                    )}
+                  </div>
+                  <h4 className="font-black text-slate-800 text-sm leading-tight">{f.item_label}</h4>
+                  {closed && f.closed_at && (
+                    <p className="text-xs font-black text-blue-600 mt-1">
+                      Cerrado: {new Date(f.closed_at).toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" })}
+                    </p>
+                  )}
+                </div>
+                {/* Lado derecho: fecha creación + botón Ver detalles */}
+                <div className="flex flex-col items-end gap-1.5 shrink-0">
+                  <span className="text-[9px] text-slate-400 font-bold">{new Date(f.created_at).toLocaleDateString()}</span>
+                  <button
+                    onClick={() => setViewFinding(f)}
+                    className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[9px] font-black uppercase tracking-wide transition-all shadow-sm"
+                  >
+                    <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                    Ver detalles
+                  </button>
+                </div>
               </div>
-              <h4 className="font-black text-slate-800 text-sm leading-tight">{f.item_label}</h4>
-              {closed && f.closed_at && (
-                <p className="text-xs font-black text-blue-600 mt-1">
-                  Cerrado: {new Date(f.closed_at).toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" })}
-                </p>
-              )}
             </div>
             {f.photo_url && (
               <div className="cursor-zoom-in" onClick={() => setZoomImage(f.photo_url!)}>
