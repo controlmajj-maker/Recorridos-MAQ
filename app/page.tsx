@@ -48,6 +48,7 @@ export default function SegurMapApp() {
   const [isFinishing, setIsFinishing] = useState(false);
   const [showFinishConfirm, setShowFinishConfirm] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [showNewInspectionModal, setShowNewInspectionModal] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [cancelPassword, setCancelPassword] = useState("");
@@ -101,15 +102,31 @@ export default function SegurMapApp() {
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
+    setLoadError(false);
     try {
+      // Timeout de 10s por si la DB tarda o no responde (Vercel cold start, pool agotado)
+      const fetchWithTimeout = (url: string) => {
+        const controller = new AbortController();
+        const id = setTimeout(() => controller.abort(), 10000);
+        return fetch(url, { signal: controller.signal }).finally(() => clearTimeout(id));
+      };
+
       const [insRes, finRes, cfgRes] = await Promise.all([
-        fetch("/api/inspections"),
-        fetch("/api/findings"),
-        fetch("/api/config"),
+        fetchWithTimeout("/api/inspections"),
+        fetchWithTimeout("/api/findings"),
+        fetchWithTimeout("/api/config"),
       ]);
-      const insData: any[] = await insRes.json();
-      const finData: Finding[] = await finRes.json();
-      const cfgData: Record<string, string> = cfgRes.ok ? await cfgRes.json() : {};
+
+      // Parsear de forma resiliente — si la respuesta no es JSON válido, usar fallback
+      const safeJson = async (res: Response, fallback: any) => {
+        if (!res.ok) return fallback;
+        try { return await res.json(); } catch { return fallback; }
+      };
+
+      const insData: any[] = await safeJson(insRes, []);
+      const finData: Finding[] = await safeJson(finRes, []);
+      const cfgData: Record<string, string> = await safeJson(cfgRes, {});
+
       const inspList = Array.isArray(insData) ? insData : [];
       const finList = Array.isArray(finData) ? finData : [];
       setInspections(inspList);
@@ -180,8 +197,8 @@ export default function SegurMapApp() {
         }
         // If neither, leave INITIAL_ZONES as-is
       }
-    } catch (e) { console.error("[loadData] error:", e); }
-    setIsLoading(false);
+    } catch (e) { console.error("[loadData] error:", e); setLoadError(true); }
+    finally { setIsLoading(false); }
   }, []);
 
   useEffect(() => { loadData(); }, []); // eslint-disable-line
@@ -740,6 +757,25 @@ Responde en texto plano en español, sin markdown, sin asteriscos, sin símbolos
     </div>
   );
 
+  if (loadError) return (
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+      <div className="text-center max-w-sm">
+        <div className="w-14 h-14 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <svg className="w-7 h-7 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+          </svg>
+        </div>
+        <h2 className="text-slate-800 font-black text-lg mb-1">Error al cargar</h2>
+        <p className="text-slate-500 text-xs mb-4">No se pudo conectar con el servidor. Verifica tu conexión e intenta de nuevo.</p>
+        <button
+          onClick={() => loadData()}
+          className="bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase px-6 py-3 rounded-xl transition-all"
+        >
+          Reintentar
+        </button>
+      </div>
+    </div>
+  );
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 pb-24 lg:pb-0">
       {/* Header */}
