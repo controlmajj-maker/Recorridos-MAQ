@@ -45,5 +45,7 @@ export interface Inspection {
   inspector: string;
   summary?: string;
   zones_data?: Zone[];
+  is_active?: boolean;
+  is_finishing?: boolean;
   created_at: string;
 }
